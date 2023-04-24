@@ -1,0 +1,31 @@
+// create a sheet with search query data from last 30 days
+
+function main() {
+  
+  let ss = SpreadsheetApp.openByUrl('');  // enter sheet url between the quotes
+
+  let query = AdsApp.report(
+    `
+    SELECT 
+      search_term_view.search_term, 
+      search_term_view.status, 
+      campaign.name,
+      metrics.impressions, 
+      metrics.clicks, 
+      metrics.cost_micros, 
+      metrics.conversions, 
+      metrics.conversions_value
+
+    FROM 
+      search_term_view
+
+    WHERE 
+      segments.date DURING LAST_30_DAYS
+      AND metrics.cost_micros > 1000000
+      AND campaign.advertising_channel_type = "SEARCH"
+    `
+    ); // cost >$1
+
+  query.exportToSheet(ss.getSheetByName('Sheet1')); 
+
+} // end main
