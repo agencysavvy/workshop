@@ -1,0 +1,11 @@
+let today = new Date();
+let date91DaysAgo = new Date();
+date91DaysAgo.setDate(today.getDate() - 91);
+
+let formatted91 = Utilities.formatDate(date91DaysAgo, "GMT", "yyyy-MM-dd");
+let formattedToday = Utilities.formatDate(today, "GMT", "yyyy-MM-dd");
+let dateRange = formatted91 + " AND " + formattedToday
+
+
+// use in a literal, eg
+// `WHERE segments.date BETWEEN "` + formatted91 + `" AND "` + formattedToday + `
