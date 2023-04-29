@@ -1,0 +1,44 @@
+// create a sheet with search query data from 91 days ago up until yesterday
+
+function main() {
+  
+  let ss = SpreadsheetApp.openByUrl('');  // enter sheet url between the quotes
+
+  let today = new Date();
+  let yesterday = new Date();
+  let date91DaysAgo = new Date();
+
+  yesterday.setDate(today.getDate() - 1);
+  date91DaysAgo.setDate(today.getDate() - 91);
+  
+  let formatted91 = Utilities.formatDate(date91DaysAgo, "GMT", "yyyy-MM-dd");
+  let formatted1 = Utilities.formatDate(yesterday, "GMT", "yyyy-MM-dd");
+  let dateRange = ' "' + formatted91 + '" AND "' + formatted1 + '" '; // scripts are VERY fiddly with quotes. dates must be wrapped in quotes
+  
+  let query = AdsApp.report(
+    `
+    SELECT 
+      search_term_view.search_term, 
+      search_term_view.status, 
+      campaign.name,
+      metrics.impressions, 
+      metrics.clicks, 
+      metrics.cost_micros, 
+      metrics.conversions, 
+      metrics.conversions_value
+
+    FROM 
+      search_term_view
+
+    WHERE 
+      segments.date BETWEEN ` + dateRange + `
+      AND metrics.cost_micros > 1000000
+      AND campaign.advertising_channel_type = "SEARCH"
+    `
+    ); // cost >$1 - note WHERE date BETWEEN, not DURING, now that we're using a range of two dates
+    
+    // to filter for campaigns that 'contain' certain text, use regex, eg       AND campaign.name REGEXP_MATCH ".*Brand.*" 
+    
+  query.exportToSheet(ss.getActiveSheet());  // note the alternative here. Instead of using the sheet name, we can use the getActiveSheet method
+
+} // end main
