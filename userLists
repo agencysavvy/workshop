@@ -1,0 +1,30 @@
+function main() {
+  // Get the spreadsheet 
+  let ss = SpreadsheetApp.openByUrl('');  // as usual, enter URL of sheet here
+  var sheet = ss.getSheetByName('UserLists');  // change tab name as needed
+ 
+  // Create an empty array to store the user list info
+  var userListInfo = [];
+  
+  // Add the header row to the spreadsheet
+  userListInfo.push(['List Name', 'List Size', 'Membership Duration']);
+  
+  // Get the user lists
+  const userlists = AdsApp.userlists().get();
+  
+  // Iterate through the user lists, for each get the user list name, size for search, and membership duration
+  for (const userlist of userlists) {
+    var listName = userlist.getName();
+    var listSize = userlist.getSizeForSearch();
+    var listDuration = userlist.getMembershipLifeSpan();
+    
+    // Push the user list info to the array
+    userListInfo.push([listName, listSize, listDuration]);
+  }
+  
+  // Get the range of cells to output the array
+  var range = sheet.getRange(1, 1, userListInfo.length, userListInfo[0].length);
+
+  // Output the user list info to the sheet all in one go (much faster than appending row by row
+  range.setValues(userListInfo);
+}
