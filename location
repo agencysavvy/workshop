@@ -1,0 +1,41 @@
+function main() {
+  
+  // make a copy of the tempalte sheet: https://docs.google.com/spreadsheets/d/1s3EkhKOHjfJHFHFIPc9-Y5K2mV6N100P-1ixm9cOtzg/copy
+  //
+  let ss = SpreadsheetApp.openByUrl('');  // enter sheet url between the quotes
+  let sheet = ss.getSheetByName('dates');
+  
+  // get named ranges. 30 days not needed
+  let range90 = sheet.getRange('between90').getValue();
+  let range180 = sheet.getRange('between180').getValue(); 
+  let range365 = sheet.getRange('between365').getValue();   
+  
+  // 30 days
+  let query = AdsApp.report(
+    `SELECT geographic_view.country_criterion_id, segments.geo_target_region, metrics.cost_micros, metrics.conversions
+    FROM geographic_view
+    WHERE segments.date DURING LAST_30_DAYS ` ); 
+  query.exportToSheet(ss.getSheetByName('30')); 
+  
+  // 90 days
+  let query90 = AdsApp.report(
+    `SELECT geographic_view.country_criterion_id, segments.geo_target_region, metrics.cost_micros, metrics.conversions
+    FROM geographic_view
+    WHERE segments.date BETWEEN ` + range90 ); 
+  query90.exportToSheet(ss.getSheetByName('90')); 
+
+  // 180 days
+  let query180 = AdsApp.report(
+    `SELECT geographic_view.country_criterion_id, segments.geo_target_region, metrics.cost_micros, metrics.conversions
+    FROM geographic_view
+    WHERE segments.date BETWEEN ` + range180 ); 
+  query180.exportToSheet(ss.getSheetByName('180')); 
+
+  // 365 days
+  let query365 = AdsApp.report(
+    `SELECT geographic_view.country_criterion_id, segments.geo_target_region, metrics.cost_micros, metrics.conversions
+    FROM geographic_view
+    WHERE segments.date BETWEEN ` + range365 ); 
+  query365.exportToSheet(ss.getSheetByName('365')); 
+  
+} // end main
