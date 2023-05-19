@@ -1,6 +1,6 @@
 function main() {
   
-  // make a copy of the tempalte sheet: https://docs.google.com/spreadsheets/d/1s3EkhKOHjfJHFHFIPc9-Y5K2mV6N100P-1ixm9cOtzg/copy
+  // make a copy of the template sheet: https://docs.google.com/spreadsheets/d/1s3EkhKOHjfJHFHFIPc9-Y5K2mV6N100P-1ixm9cOtzg/copy
   //
   let ss = SpreadsheetApp.openByUrl('');  // enter sheet url between the quotes
   let sheet = ss.getSheetByName('dates');
@@ -39,3 +39,20 @@ function main() {
   query365.exportToSheet(ss.getSheetByName('365')); 
   
 } // end main
+
+
+/*   other fields you can use are:
+
+geo_target_airport
+geo_target_canton
+geo_target_city
+geo_target_county
+geo_target_district
+geo_target_metro
+geo_target_most_specific_location
+geo_target_postal_code
+geo_target_province
+geo_target_region
+geo_target_state
+
+*/
