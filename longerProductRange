@@ -1,0 +1,25 @@
+  let prodDays = 181 // how many days data do you want to use to identify zombie (0 click) products?  
+  
+  
+  //  Date stuff
+  let MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+  let now = new Date();
+  let from = new Date(now.getTime() - zombieDays * MILLIS_PER_DAY);       // xx days in the past  
+  let prod180 = new Date(now.getTime() - prodDays * MILLIS_PER_DAY);       // xx days in the past    
+  let to = new Date(now.getTime() - 1 * MILLIS_PER_DAY);                  // yesterday
+  let timeZone = AdsApp.currentAccount().getTimeZone();
+  let zombieRange = ' segments.date BETWEEN "' + Utilities.formatDate(from, timeZone, 'yyyy-MM-dd') + '" AND "' + Utilities.formatDate(to, timeZone, 'yyyy-MM-dd') + '"' 
+  let prodDate = ' segments.date BETWEEN "' + Utilities.formatDate(prod180, timeZone, 'yyyy-MM-dd') + '" AND "' + Utilities.formatDate(to, timeZone, 'yyyy-MM-dd') + '"'
+  
+  
+  let p = [campName, prodTitle, cost, conv, value, impr,chType,prodID,prodC0,prodC1,prodC2,prodC3,prodC4,prodT1,prodT2,prodT3,prodT4,prodT5] // product totals 
+  let pQuery = 'SELECT ' + p.join(',')  + 
+      ' FROM shopping_performance_view  ' + 
+      ' WHERE ' + date30 + pMaxOnly + order ; 
+  let p180Query = 'SELECT ' + p.join(',')  + 
+      ' FROM shopping_performance_view  ' + 
+      ' WHERE ' + prodDate + pMaxOnly + order ;   
+
+
+  // call report function to pull data & push it to the named tabs in the sheet
+  runReport(p180Query,  ss.getSheetByName('r_prod_t180'));  
