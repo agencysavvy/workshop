@@ -1,0 +1,172 @@
+/******************************************
+* RSA Report
+* @version: 1.0
+* @authors: Frederick Vallaeys (Optmyzr), GPT-4 (openAI)
+* -------------------------------
+* Install this script in your Google Ads account (not an MCC account)
+* to generate a textual summary of campaign performance.
+* The text is generated using GPT and uses data from the Google Ads
+* account in which this script is installed
+* --------------------------------
+* For more PPC tools, visit www.optmyzr.com.
+******************************************/
+
+var OPEN_AI_API_KEY = ''; // get your own API key at https://platform.openai.com/account/api-keys
+
+var GPT_MODEL = 'gpt-3.5-turbo';
+
+// Enter your own list of facts so that the summary follows your PPC management style and goals
+var FACTS =  ["facts: The target CPA is $20.",
+              "A cost higher is bad, and a cost lower is good.",
+              "If the Search lost IS (budget) > 10% and the CPA is below the target, the budget should be raised.",
+              "If the Search lost IS (budget) > 10% the bids should be adjusted"];
+  
+// Play with the prompt to get different styles of summarizations
+var PROMPT = "prompt: write a summary of the campaigns' performance comparing the 2 periods. Do not include Search Lost IS in the summary.";
+
+function main() {
+  var date = new Date();
+  var firstDayPrevMonth = new Date(date.getFullYear(), date.getMonth() - 1, 1);
+  var lastDayPrevMonth = new Date(date.getFullYear(), date.getMonth(), 0);
+  var firstDayMonthBeforeThat = new Date(date.getFullYear(), date.getMonth() - 2, 1);
+  var lastDayMonthBeforeThat = new Date(date.getFullYear(), date.getMonth() - 1, 0);
+
+  var prevMonth = getFormattedDate(firstDayPrevMonth) + ',' + getFormattedDate(lastDayPrevMonth);
+  var monthBeforeThat = getFormattedDate(firstDayMonthBeforeThat) + ',' + getFormattedDate(lastDayMonthBeforeThat);
+
+  var metrics = ['Clicks', 'Impressions', 'Cost', 'Ctr', 'AverageCpc', 'Conversions', 'ConversionRate', 'CostPerConversion'];
+  var headers = ['CampaignName'];
+
+  metrics.forEach(function (metric) {
+    headers.push(metric + '_PrevMonth');
+    headers.push(metric + '_MonthBeforeThat');
+    headers.push(metric + '_ChangePercent');
+  });
+
+  var campaigns = {};
+
+  var report = AdsApp.report(
+    'SELECT CampaignName, ' + metrics.join(', ') +
+    ' FROM CAMPAIGN_PERFORMANCE_REPORT ' +
+    ' WHERE CampaignStatus IN ["ENABLED", "PAUSED"] ' +
+    ' DURING ' + monthBeforeThat
+  );
+
+  var rows = report.rows();
+  while (rows.hasNext()) {
+    var row = rows.next();
+    var campaignName = row['CampaignName'];
+
+    if (!campaigns[campaignName]) {
+      campaigns[campaignName] = {};
+    }
+
+    metrics.forEach(function (metric) {
+      campaigns[campaignName][metric + '_MonthBeforeThat'] = parseFloat(row[metric] || '0');
+    });
+  }
+
+  report = AdsApp.report(
+    'SELECT CampaignName, ' + metrics.join(', ') +
+    ' FROM CAMPAIGN_PERFORMANCE_REPORT ' +
+    ' WHERE CampaignStatus IN ["ENABLED", "PAUSED"] ' +
+    ' DURING ' + prevMonth
+  );
+
+  rows = report.rows();
+  while (rows.hasNext()) {
+    var row = rows.next();
+    var campaignName = row['CampaignName'];
+
+    if (!campaigns[campaignName]) {
+      campaigns[campaignName] = {};
+    }
+
+    metrics.forEach(function (metric) {
+      var valuePrevMonth = parseFloat(row[metric] || '0');
+      campaigns[campaignName][metric + '_PrevMonth'] = valuePrevMonth;
+
+      var valueMonthBeforeThat = campaigns[campaignName][metric + '_MonthBeforeThat'] || 0;
+
+      var changePercent = ((valuePrevMonth - valueMonthBeforeThat) / valueMonthBeforeThat) * 100;
+      campaigns[campaignName][metric + '_ChangePercent'] = isNaN(changePercent) ? 'N/A' : changePercent.toFixed(2) + '%';
+    });
+  }
+
+  var csvRows = [headers.join(',')];
+
+  for (var campaignName in campaigns) {
+    var csvRow = [campaignName];
+
+    metrics.forEach(function (metric) {
+      csvRow.push(campaigns[campaignName][metric + '_PrevMonth'] || '0');
+      csvRow.push(campaigns[campaignName][metric + '_MonthBeforeThat'] || '0');
+      csvRow.push(campaigns[campaignName][metric + '_ChangePercent'] || 'N/A');
+    });
+
+    csvRows.push(csvRow.join(','));
+  }
+var adsData = csvRows.join('\n');
+  Logger.log(adsData);
+  
+  var factsText = FACTS.join("\n");
+  Logger.log("factsText: " + factsText);
+  var prompt = "data in csv: " + adsData + "\n " + factsText + "\n " + PROMPT; 
+  var gptResponse = generateTextOpenAI(prompt);
+}
+
+function getFormattedDate(date) {
+  var month = '' + (date.getMonth() + 1);
+  var day = '' + date.getDate();
+  var year = date.getFullYear();
+
+  if (month.length < 2) month = '0' + month;
+  if (day.length < 2) day = '0' + day;
+
+  return [year, month, day].join('');
+}
+
+function generateTextOpenAI(prompt) {
+  
+  //texts.pop();
+
+  Logger.log("prompt: " + prompt);
+  var url = 'https://api.openai.com/v1/chat/completions';
+  var messages= [
+    {"role": "user", "content": prompt}
+  ];
+  
+  var payload = {
+    "model": GPT_MODEL,
+    "messages": messages
+  };
+  
+  var httpOptions = {
+    "method" : "POST",
+    "muteHttpExceptions": true,
+    "contentType": "application/json",
+    "headers" : {
+      "Authorization" : 'Bearer ' + OPEN_AI_API_KEY  
+    },
+    'payload': JSON.stringify(payload)
+  };
+  
+  //Logger.log(JSON.stringify(payload));
+  //var response = JSON.parse(UrlFetchApp.fetch(url, httpOptions));
+  
+  var response = UrlFetchApp.fetch(url, httpOptions);
+  // Parsing the response
+  var responseJson = JSON.parse(response.getContentText());
+  //Logger.log("response: " + response);
+  //Logger.log("responseJson: " + responseJson);
+  
+  // Access the 'choices' array in the response
+  var choices = responseJson.choices;
+  
+  // Access the first choice and the 'text' key within it
+  var text = choices[0].message.content;
+  
+  //Logger.log(text);
+  return (text);
+
+}
