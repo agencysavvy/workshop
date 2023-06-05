@@ -1,0 +1,70 @@
+/******************************************
+* GPT Connector for Google Ads
+* @version: 1.0
+* @authors: Naman Jindal (Optmyzr), Frederick Vallaeys (Optmyzr)
+* -------------------------------
+* This function can be used to make a call to openAI's GPT in a Google Ads script.
+* Use it to send prompts to GPT that include context about a Google Ads account.
+* For example, you can send campaign data from Google Ads as part of a prompt that 
+* generates a text string with a summary of the account changes and performance.
+* --------------------------------
+* For more PPC tools, visit www.optmyzr.com.
+******************************************/
+
+
+var OPEN_AI_API_KEY = ''; // get your own API key at https://platform.openai.com/account/api-keys
+
+var GPT_MODEL = 'gpt-3.5-turbo';
+
+// Do not edit anything below this line
+function main() {
+  
+  prompt = "apples, pears, oranges, prompt: suggest 2 more";
+  var response = generateTextOpenAI(prompt);
+  Logger.log(response);
+  
+}
+
+function generateTextOpenAI(prompt) {
+  
+  //texts.pop();
+
+  Logger.log("prompt: " + prompt);
+  var url = 'https://api.openai.com/v1/chat/completions';
+  var messages= [
+    {"role": "user", "content": prompt}
+  ];
+  
+  var payload = {
+    "model": GPT_MODEL,
+    "messages": messages
+  };
+  
+  var httpOptions = {
+    "method" : "POST",
+    "muteHttpExceptions": true,
+    "contentType": "application/json",
+    "headers" : {
+      "Authorization" : 'Bearer ' + OPEN_AI_API_KEY  
+    },
+    'payload': JSON.stringify(payload)
+  };
+  
+  //Logger.log(JSON.stringify(payload));
+  //var response = JSON.parse(UrlFetchApp.fetch(url, httpOptions));
+  
+  var response = UrlFetchApp.fetch(url, httpOptions);
+  // Parsing the response
+  var responseJson = JSON.parse(response.getContentText());
+  //Logger.log("response: " + response);
+  //Logger.log("responseJson: " + responseJson);
+  
+  // Access the 'choices' array in the response
+  var choices = responseJson.choices;
+  
+  // Access the first choice and the 'text' key within it
+  var text = choices[0].message.content;
+  
+  return (text);
+
+}
