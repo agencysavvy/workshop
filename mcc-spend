@@ -1,0 +1,28 @@
+// enter sheet url
+var ss = ''; 
+
+function main() {
+    var headers = ["Client ID", "Client Name", "Spend"];
+    var accountData = [headers];
+    
+   var today = new Date();
+    var yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    var firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    var startDate = Utilities.formatDate(firstDayOfMonth, "GMT", "yyyyMMdd");
+    var endDate = Utilities.formatDate(yesterday, "GMT", "yyyyMMdd");
+     
+    var accountIterator = AdsManagerApp.accounts().get();
+    while (accountIterator.hasNext()) {
+        var account = accountIterator.next();
+        AdsManagerApp.select(account);
+        var spend = account.getStatsFor(startDate, endDate).getCost();
+        var row = [account.getCustomerId(), account.getName(), spend];
+        accountData.push(row);
+    }
+
+    var spreadsheet = SpreadsheetApp.openByUrl(ss).getSheetByName("Sheet1");
+    spreadsheet.clearContents();
+    spreadsheet.getRange(1, 1, accountData.length, accountData[0].length).setValues(accountData);
+    spreadsheet.getRange(1, 1, 1, accountData[0].length).setFontWeight("bold");
+}
