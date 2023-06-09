@@ -1,0 +1,76 @@
+// template donut sheet is in WebSavvy SOP doc (ask Trev)
+
+// v26 - additional donut sheet
+
+function main() {
+  let ds = SpreadsheetApp.openByUrl(''); // <- enter URL over there
+  let zombieDays = 366 // how many days data do you want to use to identify zombie (0 click) products?
+  let prodDays = 181 // how many days data do you want to use to identify the longer date range for products?  
+  
+// don’t change any code below this line ——————————————————————————
+  
+  // define query elements. wrap with spaces for safety
+  let impr        = ' metrics.impressions ';
+  let clicks      = ' metrics.clicks ';
+  let cost        = ' metrics.cost_micros ';
+  let conv        = ' metrics.conversions '; 
+  let value       = ' metrics.conversions_value '; 
+  let segDate     = ' segments.date ';  
+  let prodTitle   = ' segments.product_title ';
+  let prodID      = ' segments.product_item_id ';
+  let prodC0      = ' segments.product_custom_attribute0 ';
+  let prodC1      = ' segments.product_custom_attribute1 ';
+  let prodC2      = ' segments.product_custom_attribute2 ';
+  let prodC3      = ' segments.product_custom_attribute3 ';
+  let prodC4      = ' segments.product_custom_attribute4 '; 
+  let prodT1      = ' segments.product_type_l1 ';
+  let prodT2      = ' segments.product_type_l2 ';
+  let prodT3      = ' segments.product_type_l3 ';
+  let prodT4      = ' segments.product_type_l4 ';
+  let prodT5      = ' segments.product_type_l5 ';
+  let campName    = ' campaign.name ';
+  let chType      = ' campaign.advertising_channel_type ';
+  let pMaxOnly    =	' AND campaign.advertising_channel_type = "PERFORMANCE_MAX" '; 
+  let date30      = ' segments.date DURING LAST_30_DAYS ';  
+  let order       = ' ORDER BY campaign.name '; 
+  let orderImpr   = ' ORDER BY metrics.impressions DESC '; 
+  
+  
+  //  Date stuff
+  let MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+  let now = new Date();
+  let from = new Date(now.getTime() - zombieDays * MILLIS_PER_DAY);       // xx days in the past  
+  let prod180 = new Date(now.getTime() - prodDays * MILLIS_PER_DAY);       // xx days in the past    
+  let to = new Date(now.getTime() - 1 * MILLIS_PER_DAY);                  // yesterday
+  let timeZone = AdsApp.currentAccount().getTimeZone();
+  let zombieRange = ' segments.date BETWEEN "' + Utilities.formatDate(from, timeZone, 'yyyy-MM-dd') + '" AND "' + Utilities.formatDate(to, timeZone, 'yyyy-MM-dd') + '"' 
+  let prodDate = ' segments.date BETWEEN "' + Utilities.formatDate(prod180, timeZone, 'yyyy-MM-dd') + '" AND "' + Utilities.formatDate(to, timeZone, 'yyyy-MM-dd') + '"'
+  
+  // build queries                     
+  let dp = [campName, prodTitle, cost, conv, value, impr, clicks, chType,prodID,prodC0,prodC1,prodC2,prodC3,prodC4] // product totals with clicks for donut
+  let dpQuery = 'SELECT ' + dp.join(',')  + 
+      ' FROM shopping_performance_view  ' + 
+      ' WHERE ' + date30 + pMaxOnly + order ; 
+      
+  let dp180Query = 'SELECT ' + dp.join(',')  + 
+      ' FROM shopping_performance_view  ' + 
+      ' WHERE ' + prodDate + pMaxOnly + order ;  
+  
+  let zombies = [prodID, clicks, impr, prodTitle] // zombie (0click) products - last xx days, set xx days at top of script
+  let zQuery = 'SELECT ' + zombies.join(',') +
+      ' FROM shopping_performance_view ' +
+      ' WHERE metrics.clicks < 1 AND ' + zombieRange + orderImpr ;  
+
+  // donut chart update, call report & push data to sheets
+  runReport(dpQuery,     ds.getSheetByName('Raw'));  // send to donut sheet
+  // runReport(dp180Query,  ds.getSheetByName('Raw180'));    // uncomment if both date ranges are needed
+  runReport(zQuery,      ds.getSheetByName('Zombies365'));  
+  
+} // end main
+
+
+// query & export report data to named sheet
+function runReport(q,sh) {
+  const report = AdsApp.report(q);
+  report.exportToSheet(sh);  
+}
