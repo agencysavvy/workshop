@@ -1,0 +1,80 @@
+// ------------------------------
+// USER CONFIGURATION SECTION
+// ------------------------------
+
+// Enter your Google Sheet URL here, ensure you include the / after the long strong, you don't need the edit... on the end
+const SHEET_URL = '';
+
+// Enter the name of the sheet/tab where you want the data to be exported
+const TAB_NAME = 'Sheet1';
+
+// Enter your GAQL query here
+const GAQL_QUERY = `
+  SELECT 
+    search_term_view.search_term, 
+    search_term_view.status, 
+    campaign.name,
+    metrics.impressions, 
+    metrics.clicks, 
+    metrics.cost_micros, 
+    metrics.conversions, 
+    metrics.conversions_value
+  FROM 
+    search_term_view
+  WHERE 
+    segments.date DURING LAST_30_DAYS
+    AND metrics.cost_micros > 1000000
+    AND campaign.advertising_channel_type = "SEARCH"
+`;
+
+// ------------------------------
+// DO NOT CHANGE CODE BELOW THIS LINE
+// ------------------------------
+
+function main() {
+  let ss = SpreadsheetApp.openByUrl(SHEET_URL);  
+  let sheet = ss.getSheetByName(TAB_NAME);  
+  let query = AdsApp.report(GAQL_QUERY);
+  query.exportToSheet(sheet);
+  
+  // Parse SELECT statement to get columns
+  let columns = parseSelectStatement(GAQL_QUERY.split("FROM")[0]);
+  
+  // Create named ranges based on parsed columns
+  createNamedRanges(sheet, columns);
+}
+
+
+// Function to parse SELECT statement and return an array of columns
+function parseSelectStatement(selectStatement) {
+  let columns = selectStatement.replace("SELECT", "").split("FROM")[0].trim().split(",");
+  return columns.map(column => column.trim().split(".")[1] || column.trim());
+}
+
+
+// Function to create named ranges based on parsed columns
+function createNamedRanges(sheet, columns) {
+  let ss = sheet.getParent();
+  
+  let nameMapping = {
+    'search_term': 'terms',
+    'status': 'status',
+    'name': 'campname',
+    'impressions': 'impr',
+    'clicks': 'clicks',
+    'cost_micros': 'cost',
+    'conversions': 'conv',
+    'conversions_value': 'value'
+  };
+  
+  let colNum = 1;  // Initialize to 1 for the first column in Sheets
+  for (let column of columns) {
+    let rangeName = nameMapping[column];
+    if (rangeName) {
+      let range = sheet.getRange(2, colNum, sheet.getMaxRows()-1, 1);
+      ss.setNamedRange(rangeName, range);
+    }
+    colNum++;
+  }
+}
+    
