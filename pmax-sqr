@@ -3,22 +3,22 @@
 // -------------------------
 // Please enter your spreadsheet URL between the quotes below.
 let ss = SpreadsheetApp.openByUrl('YOUR_SPREADSHEET_URL_HERE');
-ss.rename('Mike Rhodes - Search Term Insights');
+
+// Set to false if you want search categories for ALL campaigns, not just PERFORMANCE_MAX
+let pmaxOnly = true; 
 
 // Don't change the code below this line.
 // -------------------------
-// -------------------------
+
+ss.rename('Mike Rhodes - Search Category Insights');
 
 function formatCampaignsSheet(sheet) {
     // Bold the first row
-    sheet.getRange(1, 1, 1, sheet.getLastColumn()).setFontWeight("bold");
-    
+    sheet.getRange(1, 1, 1, sheet.getLastColumn()).setFontWeight("bold");    
     // Freeze the first row
-    sheet.setFrozenRows(1);
-    
+    sheet.setFrozenRows(1);   
     // Set the width of column A to 500
     sheet.setColumnWidth(1, 500);
-
     // Set the decimal places for conversions & conversion value to 1 decimal place
     sheet.getRange(2, 5, sheet.getLastRow()).setNumberFormat("0.0");  // conversions in col 5
     sheet.getRange(2, 6, sheet.getLastRow()).setNumberFormat("0.0");  // conversion value in col 6
@@ -26,35 +26,39 @@ function formatCampaignsSheet(sheet) {
 
 function formatCampaignIdSheet(sheet) {
     // Bold the first row
-    sheet.getRange(1, 1, 1, sheet.getLastColumn()).setFontWeight("bold");
-    
+    sheet.getRange(1, 1, 1, sheet.getLastColumn()).setFontWeight("bold");    
     // Freeze the first row
-    sheet.setFrozenRows(1);
-    
+    sheet.setFrozenRows(1);   
     // Set the width of column A to 500
     sheet.setColumnWidth(1, 500);
-
     // Set the decimal places for conversions & conversion value to 1 decimal place
     sheet.getRange(2, 4, sheet.getLastRow()).setNumberFormat("0.0");  // conversions in col 4
     sheet.getRange(2, 5, sheet.getLastRow()).setNumberFormat("0.0");  // conversion value in col 5
 }
 
 function main() {
+
+    // Add the additional filter if pmaxOnly is true
+    let performanceMaxFilter = pmaxOnly ? ' AND campaign.advertising_channel_type = "PERFORMANCE_MAX" ' : '';
+
     // 1. Extract Campaign IDs with Status not 'REMOVED' and impressions > 0
     let campaignIdsQuery = AdsApp.report(
         `
         SELECT 
-        campaign.id, 
-        campaign.name, 
-        metrics.clicks, 
-        metrics.impressions, 
-        metrics.conversions, 
-        metrics.conversions_value
-        FROM campaign
-        WHERE campaign.status != 'REMOVED'
-        AND metrics.impressions > 0
-        AND segments.date DURING LAST_30_DAYS
-        ORDER BY metrics.conversions DESC
+          campaign.id, 
+          campaign.name, 
+          metrics.clicks, 
+          metrics.impressions, 
+          metrics.conversions, 
+          metrics.conversions_value
+        FROM 
+          campaign
+        WHERE 
+          campaign.status != 'REMOVED'
+          AND metrics.impressions > 0
+          AND segments.date DURING LAST_30_DAYS
+        ORDER BY 
+          metrics.conversions DESC
         `
     );
     
@@ -94,16 +98,18 @@ function main() {
         let query = AdsApp.report(
             `
             SELECT 
-            campaign_search_term_insight.category_label, 
-            metrics.clicks, 
-            metrics.impressions, 
-            metrics.conversions,
-            metrics.conversions_value
-            FROM campaign_search_term_insight 
+              campaign_search_term_insight.category_label, 
+              metrics.clicks, 
+              metrics.impressions, 
+              metrics.conversions,
+              metrics.conversions_value
+            FROM 
+              campaign_search_term_insight 
             WHERE 
-            segments.date DURING LAST_30_DAYS 
-            AND campaign_search_term_insight.campaign_id = '${campaignId}'
-            ORDER BY metrics.conversions DESC
+              segments.date DURING LAST_30_DAYS 
+              AND campaign_search_term_insight.campaign_id = '${campaignId}'
+            ORDER BY 
+              metrics.conversions DESC
             `
         );
 
