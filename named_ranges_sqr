@@ -28,7 +28,11 @@ const GAQL_QUERY = `
 `;
 
 // ------------------------------
-// DO NOT CHANGE CODE BELOW THIS LINE
+// ------------------------------
+// to auto create names ranges
+// you'll also need to change the createNamedRanges function below - but only if you change the SQL statement above
+// only change code below this line if you know what you're doing ;)
+// ------------------------------
 // ------------------------------
 
 function main() {
