@@ -1,0 +1,484 @@
+// v2.0 - flexible date range :)
+// copy template sheet & then grab YOUR url & paste below in SHEET_URL
+// template is: 
+// https://docs.google.com/spreadsheets/d/1aHIJ4YFDnIbS6H2TQjDFnJAeOBCYS3XqNeTZlO5_Rk4/copy
+
+
+// user config section
+
+  let SHEET_URL    = ''
+  
+  let clientCode   = ''     // this string will be added to the sheet name 
+  let numberOfDays = 30      // how many days data do you want to get?  
+  
+  // only change these if you really want - these create tabs which are used in other sheets available from MikeRhodes.com.au
+  let zombieDays   = 366    // how many days data do you want to use to identify zombie (0 click) products?
+  let productDays  = 181    // how many days data do you want to use to identify 'long range' products?  
+
+  
+// don’t change any code below this line ——————————————————————————
+
+  
+  function main() {
+    
+// Setup Sheet
+    let accountName = AdsApp.currentAccount().getName();
+    let sheetNameIdentifier = clientCode ? clientCode : accountName;
+    let ss = SpreadsheetApp.openByUrl(SHEET_URL);
+    ss.rename(sheetNameIdentifier + ' - PMax Insights - MikeRhodes.com.au');
+  
+
+// define query elements. wrap with spaces for safety
+    let impr       = ' metrics.impressions ';
+    let clicks     = ' metrics.clicks ';
+    let cost       = ' metrics.cost_micros ';
+    let conv       = ' metrics.conversions ';
+    let value      = ' metrics.conversions_value ';
+    let allConv    = ' metrics.all_conversions ';
+    let allValue   = ' metrics.all_conversions_value ';
+    let views      = ' metrics.video_views ';
+    let cpv        = ' metrics.average_cpv ';
+    let segDate    = ' segments.date ';
+    let prodTitle  = ' segments.product_title ';
+    let prodID     = ' segments.product_item_id ';
+    let campName   = ' campaign.name ';
+    let campId     = ' campaign.id ';
+    let chType     = ' campaign.advertising_channel_type ';
+    let aIdAsset   = ' asset.resource_name ';
+    let aId        = ' asset.id ';
+    let assetSource= ' asset.source ';
+    let agId       = ' asset_group.id ';
+    let assetFtype = ' asset_group_asset.field_type ';
+    let adPmaxPerf = ' asset_group_asset.performance_label ';
+    let agStrength = ' asset_group.ad_strength ';
+    let agStatus   = ' asset_group.status ';
+    let asgName    = ' asset_group.name ';
+    let lgType     = ' asset_group_listing_group_filter.type ';
+    let aIdCamp    = ' segments.asset_interaction_target.asset ';
+    let interAsset = ' segments.asset_interaction_target.interaction_on_this_asset ';
+    let pMaxOnly   = ' AND campaign.advertising_channel_type = "PERFORMANCE_MAX" ';
+    let agFilter   = ' AND asset_group_listing_group_filter.type != "SUBDIVISION" ';
+    let notInter   = ' AND segments.asset_interaction_target.interaction_on_this_asset != "TRUE" ';
+    let order      = ' ORDER BY campaign.name ';
+
+// Get the time zone of the current Google Ads account
+    let timeZone = AdsApp.currentAccount().getTimeZone();
+
+// Current date ranges
+    let today = new Date();
+    let yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);              // Yesterday
+    let startDate = new Date(today);
+    startDate.setDate(today.getDate() - numberOfDays);   // Start date based on numberOfDays from config
+    let zombieStart = new Date(today);
+    zombieStart.setDate(today.getDate() - zombieDays);   // Start date for Zombie products from config
+    let productStart = new Date(today);
+    productStart.setDate(today.getDate() - productDays); // Start date for long-range products from config
+
+// Format Dates
+    let formattedYesterday = Utilities.formatDate(yesterday, timeZone, 'yyyy-MM-dd');
+    let formattedStart     = Utilities.formatDate(startDate, timeZone, 'yyyy-MM-dd');
+    let formattedZombie    = Utilities.formatDate(zombieStart, timeZone, 'yyyy-MM-dd');
+    let formattedProduct   = Utilities.formatDate(productStart, timeZone, 'yyyy-MM-dd');
+
+// SQL Date Ranges
+    let mainDateRange   = ` segments.date BETWEEN "${formattedStart}" AND "${formattedYesterday}" `;
+    let zombieDateRange = ` segments.date BETWEEN "${formattedZombie}" AND "${formattedYesterday}" `;
+    let prodDateRange   = ` segments.date BETWEEN "${formattedProduct}" AND "${formattedYesterday}" `;
+
+    
+// build queries
+    let assetGroupAssetColumns = [campName, asgName, agId, aIdAsset, assetFtype, adPmaxPerf, agStrength, agStatus, assetSource, campId] 
+    let assetGroupAssetQuery = 'SELECT ' + assetGroupAssetColumns.join(',') +
+      ' FROM asset_group_asset ' 
+
+    let displayVideoColumns = [segDate, campName, aIdCamp, cost, conv, value, views, cpv, impr, clicks, chType, interAsset, campId];
+    let displayVideoQuery = 'SELECT ' + displayVideoColumns.join(',') +
+      ' FROM campaign ' +
+      ' WHERE ' + mainDateRange + pMaxOnly + notInter + order;
+
+    let assetGroupColumns = [segDate, campName, asgName, agStrength, agStatus, lgType, impr, clicks, cost, conv, value] 
+    let assetGroupQuery = 'SELECT ' + assetGroupColumns.join(',')  + 
+        ' FROM asset_group_product_group_view ' +
+        ' WHERE ' + mainDateRange + agFilter ;
+    
+    let campaignColumns = [segDate, campName, cost, conv, value, views, cpv, impr, clicks, chType, campId]; 
+    let campaignQuery = 'SELECT ' + campaignColumns.join(',') + 
+        ' FROM campaign ' +
+        ' WHERE ' + mainDateRange + pMaxOnly + order;
+
+    let productColumns = [segDate, campName, prodTitle, prodID, cost, conv, value, impr, clicks, chType, campId] 
+    let productQuery = 'SELECT ' + productColumns.join(',')  + 
+      ' FROM shopping_performance_view  ' + 
+      ' WHERE ' + mainDateRange + pMaxOnly + order ; 
+
+// Fetch data for each type - product data not neeeed yet: let productData = fetchData(productQuery); 
+    let assetGroupAssetData = fetchData(assetGroupAssetQuery);
+    let displayVideoData    = fetchData(displayVideoQuery);
+    let assetGroupData      = fetchData(assetGroupQuery);
+    let campaignData        = fetchData(campaignQuery);
+    
+// Join the tables on aIdAsset / aIdCamp
+    let joinedData = getJoinedData(assetGroupAssetData, displayVideoData);
+
+// Filter rows where asset field type contains "MARKETING" or "VIDEO"
+    let filteredDataForDisplay  = joinedData.filter(row => row.assetFtype && row.assetFtype.includes('MARKETING'));
+    let filteredDataForVideo    = joinedData.filter(row => row.assetFtype && row.assetFtype.includes('VIDEO'));
+
+// Process data - product data no needed yet: const processedProductData = processData(productData);
+    let processedDisplayData    = processData(filteredDataForDisplay);
+    let processedDataForVideo   = processData(filteredDataForVideo);
+    let processedAssetGroupData = processData(assetGroupData);
+    let processedCampData       = processData(campaignData);
+
+// Combine all non-search metrics
+    let nonSearchData = [...processedDisplayData, ...processedDataForVideo, ...processedAssetGroupData];
+
+// Calculate 'search' metrics
+    let searchResults = getSearchResults(processedCampData, nonSearchData);
+    
+// Process final summary
+    let totalData = processTotalData(processedCampData, processedAssetGroupData, processedDisplayData, processedDataForVideo, searchResults);
+    let summaryData = processSummaryData(processedCampData, processedAssetGroupData, processedDisplayData, processedDataForVideo, searchResults);    
+    
+// Output data to Google Sheet - product output not needed yet: outputDataToSheet(ss, 'product',  processedProductData);    
+    outputSummaryToSheet(ss, 'Totals',  totalData);
+    outputSummaryToSheet(ss, 'Summary', summaryData);
+ 
+} // end main
+
+
+// various additional functions ---------------------------------------------
+
+
+
+// fetch data given a query string using search (not report)
+  function fetchData(queryString) {
+    let data = [];
+    const iterator = AdsApp.search(queryString);
+    while (iterator.hasNext()) {
+      const row = iterator.next();
+      const rowData = flattenObject(row); // Flatten the row data
+      data.push(rowData);
+    }
+    return data;
+  }
+
+
+// flatten the object data to enable more processing of that data
+  function flattenObject(ob) {
+    var toReturn = {};
+    for (var i in ob) {
+      if ((typeof ob[i]) === 'object') {
+        var flatObject = flattenObject(ob[i]);
+        for (var x in flatObject) {
+          toReturn[i + '.' + x] = flatObject[x];
+        }
+      } else {
+        toReturn[i] = ob[i];
+      }
+    }
+    return toReturn;
+  }
+
+
+// get the joined data to figure out what type of asset is used
+  function getJoinedData(assetGroupAssetData, displayVideoData) {
+    let joinedData = [];
+    assetGroupAssetData.forEach(assetRow => {
+      const aIdAsset = assetRow['assetGroupAsset.resourceName'].split('~')[1];
+      const assetFtype = assetRow['assetGroupAsset.fieldType'];
+
+      const matchingDisplayRows = displayVideoData.filter(displayRow => {
+        const aIdCamp = displayRow['segments.assetInteractionTarget.asset'].split('/').pop();
+        return aIdAsset === aIdCamp;
+      });
+
+      matchingDisplayRows.forEach(match => {
+        joinedData.push({
+          ...assetRow,
+          ...match,
+          aIdAsset,  
+          assetFtype  
+        });
+      });
+    });
+    return joinedData;
+  }
+
+
+// calc the search results
+  function getSearchResults(processedCampData, nonSearchData) {
+    // Initialize an object to hold 'search' metrics
+    const searchMetrics = {};
+
+    // Sum up the non-search metrics
+    nonSearchData.forEach(row => {
+      const key = `${row.date}_${row.campaignName}`;
+      if (!searchMetrics[key]) {
+        searchMetrics[key] = {
+          date: row.date,
+          campaignName: row.campaignName,
+          cost: 0,
+          impressions: 0,
+          clicks: 0,
+          conversions: 0,
+          conversionsValue: 0
+        };
+      }
+      for (let metric of ['cost', 'impressions', 'clicks', 'conversions', 'conversionsValue']) {
+        searchMetrics[key][metric] += row[metric];
+      }
+    });
+
+    // Calculate 'search' metrics
+    const searchResults = [];
+    processedCampData.forEach(row => {
+      const rowCopy = JSON.parse(JSON.stringify(row));  // Deep copy
+      const key = `${row.date}_${row.campaignName}`;
+      if (searchMetrics[key]) {
+        for (let metric of ['cost', 'impressions', 'clicks', 'conversions', 'conversionsValue']) {
+          rowCopy[metric] -= (searchMetrics[key][metric] || 0);
+        }
+      }
+      searchResults.push(rowCopy);
+    });
+
+    return searchResults;
+  }
+
+
+// process the data
+  function processData(data) {
+    const summedData = {};
+    data.forEach(row => {
+      const date = row['segments.date'];
+      const campaignName = row['campaign.name'];
+      const key = `${date}_${campaignName}`;
+      // Initialize if the key doesn't exist
+      if (!summedData[key]) {
+        summedData[key] = {
+          'date': date,
+          'campaignName': campaignName,
+          'cost': 0,
+          'impressions': 0,
+          'clicks': 0,
+          'conversions': 0,
+          'conversionsValue': 0
+        };
+      }
+      if (row['metrics.costMicros']) {
+        summedData[key].cost += row['metrics.costMicros'] / 1000000;
+      }
+      if (row['metrics.impressions']) {
+        summedData[key].impressions += parseInt(row['metrics.impressions']);
+      }
+      if (row['metrics.clicks']) {
+        summedData[key].clicks += parseInt(row['metrics.clicks']);
+      }
+      if (row['metrics.conversions']) {
+        summedData[key].conversions += parseFloat(row['metrics.conversions']);
+      }
+      if (row['metrics.conversionsValue']) {
+        summedData[key].conversionsValue += parseFloat(row['metrics.conversionsValue']);
+      }
+    });
+
+    return Object.values(summedData);
+  }
+
+
+// output data to tab in sheet
+  function outputDataToSheet(spreadsheet, sheetName, data) {
+    let sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(sheetName);
+    }
+    sheet.clearContents();
+    if (data.length > 0) {
+      const header = [Object.keys(data[0])];
+      const rows = data.map(row => Object.values(row));
+      const allRows = header.concat(rows);
+      sheet.getRange(1, 1, allRows.length, allRows[0].length).setValues(allRows);
+    }
+  }
+
+
+// output summary data
+  function outputSummaryToSheet(ss, sheetName, summaryData) {
+    // Get the sheet with the name `sheetName` from `ss`. Create it if it doesn't exist.
+    let sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+    }
+    sheet.clear();
+    for (let i = 0; i < summaryData.length; i++) {
+      sheet.getRange(i + 1, 1, 1, summaryData[i].length).setValues([summaryData[i]]);
+    }
+    sheet.setFrozenRows(1);
+    sheet.getRange("1:1").setFontWeight("bold");
+    sheet.getRange("1:1").setWrap(true);
+    sheet.setRowHeight(1, 40);
+  }
+
+
+// create summary on one tab
+  function processSummaryData(processedCampData, processedAssetGroupData, processedDisplayData, processedDataForVideo, searchResults) {
+    const header = ['Date', 'Campaign Name', 
+                    'Camp Cost', 'Camp Conv', 'Camp Value',
+                    'Shop Cost', 'Shop Conv', 'Shop Value',
+                    'Disp Cost', 'Disp Conv', 'Disp Value',
+                    'Video Cost', 'Video Conv', 'Video Value',
+                    'Search Cost', 'Search Conv', 'Search Value'];
+
+    const summaryData = {};
+
+    // Helper function to update summaryData
+    function updateSummary(row, type) {
+      const date = row['date'];
+      const campaignName = row['campaignName'];
+      const key = `${date}_${campaignName}`;
+
+      // Initialize if the key doesn't exist
+      if (!summaryData[key]) {
+        summaryData[key] = {
+          'date': date,
+          'campaignName': campaignName,
+          'generalCost': 0, 'generalConv': 0, 'generalConvValue': 0,
+          'shoppingCost': 0, 'shoppingConv': 0, 'shoppingConvValue': 0,
+          'displayCost': 0, 'displayConv': 0, 'displayConvValue': 0,
+          'videoCost': 0, 'videoConv': 0, 'videoConvValue': 0,
+          'searchCost': 0, 'searchConv': 0, 'searchConvValue': 0
+        };
+      }
+
+      // Update the metrics
+      summaryData[key][`${type}Cost`] += row['cost'];
+      summaryData[key][`${type}Conv`] += row['conversions'];
+      summaryData[key][`${type}ConvValue`] += row['conversionsValue'];
+    }
+
+    // Process each lot of data
+    processedCampData.forEach(row => updateSummary(row, 'general'));
+    processedAssetGroupData.forEach(row => updateSummary(row, 'shopping'));
+    processedDisplayData.forEach(row => updateSummary(row, 'display'));
+    processedDataForVideo.forEach(row => updateSummary(row, 'video'));
+    searchResults.forEach(row => updateSummary(row, 'search'));
+
+    // Convert summaryData to an array format
+    const summaryArray = Object.values(summaryData).map(summaryRow => {
+      return [
+        summaryRow.date,
+        summaryRow.campaignName,
+        summaryRow.generalCost, summaryRow.generalConv, summaryRow.generalConvValue,
+        summaryRow.shoppingCost, summaryRow.shoppingConv, summaryRow.shoppingConvValue,
+        summaryRow.displayCost, summaryRow.displayConv, summaryRow.displayConvValue,
+        summaryRow.videoCost, summaryRow.videoConv, summaryRow.videoConvValue,
+        summaryRow.searchCost, summaryRow.searchConv, summaryRow.searchConvValue
+      ];
+    });
+
+    return [header, ...summaryArray];
+  }
+
+
+// Process total data for 'Totals' tab
+  function processTotalData(processedCampData, processedAssetGroupData, processedDisplayData, processedDataForVideo, searchResults) {
+    const header = ['Campaign Name', 
+                    'Camp Cost', 'Camp Conv', 'Camp Value',
+                    'Shop Cost', 'Shop Conv', 'Shop Value',
+                    'Disp Cost', 'Disp Conv', 'Disp Value',
+                    'Video Cost', 'Video Conv', 'Video Value',
+                    'Search Cost', 'Search Conv', 'Search Value'];
+
+    const totalData = {};
+
+    // Helper function to update totalData
+    function updateTotal(row, type) {
+      const campaignName = row['campaignName'];
+      const key = campaignName;
+
+      // Initialize if the key doesn't exist
+      if (!totalData[key]) {
+        totalData[key] = {
+          'campaignName': campaignName,
+          'generalCost': 0, 'generalConv': 0, 'generalConvValue': 0,
+          'shoppingCost': 0, 'shoppingConv': 0, 'shoppingConvValue': 0,
+          'displayCost': 0, 'displayConv': 0, 'displayConvValue': 0,
+          'videoCost': 0, 'videoConv': 0, 'videoConvValue': 0,
+          'searchCost': 0, 'searchConv': 0, 'searchConvValue': 0
+        };
+      }
+
+      // Update the metrics
+      totalData[key][`${type}Cost`] += row['cost'];
+      totalData[key][`${type}Conv`] += row['conversions'];
+      totalData[key][`${type}ConvValue`] += row['conversionsValue'];
+    }
+
+    // Process each lot of data
+    processedCampData.forEach(row => updateTotal(row, 'general'));
+    processedAssetGroupData.forEach(row => updateTotal(row, 'shopping'));
+    processedDisplayData.forEach(row => updateTotal(row, 'display'));
+    processedDataForVideo.forEach(row => updateTotal(row, 'video'));
+    searchResults.forEach(row => updateTotal(row, 'search'));
+
+    // Convert totalData to an array format
+    const totalArray = Object.values(totalData).map(totalRow => {
+      return [
+        totalRow.campaignName,
+        totalRow.generalCost, totalRow.generalConv, totalRow.generalConvValue,
+        totalRow.shoppingCost, totalRow.shoppingConv, totalRow.shoppingConvValue,
+        totalRow.displayCost, totalRow.displayConv, totalRow.displayConvValue,
+        totalRow.videoCost, totalRow.videoConv, totalRow.videoConvValue,
+        totalRow.searchCost, totalRow.searchConv, totalRow.searchConvValue
+      ];
+    });
+
+    return [header, ...totalArray];
+  }
+
+
+// Log first 3 rows to console
+  function logFirstThreeRows(data, label) {
+    console.log(`--- First 3 rows of ${label} ---`);
+    for (let i = 0; i < Math.min(3, data.length); i++) {
+      console.log(data[i]);
+    }
+  }
+
+
+// Output data to a tab in the sheet
+  function outputDataDebug(spreadsheet, sheetName, data) {
+    // Get the sheet by name; create a new one if it doesn't exist
+    let sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(sheetName);
+    }
+
+    // Clear existing content
+    sheet.clearContents();
+
+    // Write data
+    const rows = data.map(row => Object.values(row));
+
+    // Debug: Log the number of columns in the first row and the sheet range
+    if (rows.length > 0) {
+      console.log(`Data columns: ${rows[0].length}, Sheet columns: ${sheet.getMaxColumns()}`);
+    }
+
+    // Write data to sheet
+    if (rows.length > 0 && rows[0].length > 0) {
+      sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+    } else {
+      console.log(`No data to write for ${sheetName}`);
+    }
+  }
+
+
+/*    outputDataToSheet(ss, 'display',  processedDisplayData);
+    outputDataToSheet(ss, 'video'  ,  processedDataForVideo);
+    outputDataToSheet(ss, 'shopping', processedAssetGroupData);
+    outputDataToSheet(ss, 'campaign', processedCampData);
+    outputDataToSheet(ss, 'search',   searchResults);
+*/
